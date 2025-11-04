@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // Import para sa TapGestureRecognizer
+import 'package:flutter/gestures.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'products_screen.dart'; // Make sure this file exists and is correct
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'products_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  LoginScreen({super.key});
+  const LoginScreen({super.key}); // Gawing const
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -44,8 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => ProductsScreen()));
+        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -66,9 +66,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // 1. Background Image (Make sure 'assets/images/bg.jpg' is in pubspec.yaml)
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -77,37 +82,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-
-          // 2. Overlay for readability
           Container(
-            color: Colors.black.withOpacity(0.5), // Semi-transparent black overlay
+            color: Colors.black.withOpacity(0.5),
           ),
 
-          // 3. Login Content
+          // Login Content
           Center(
             child: SingleChildScrollView(
-              // Added for better handling on small screens
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // --- DINAGDAG NA LOGO ---
-                  // Siguraduhin na mayroon kang 'assets/images/logo.png' sa iyong proyekto
-                  // at idinagdag mo ito sa 'pubspec.yaml'
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 150, // Pwede mong baguhin ang taas nito
-                    errorBuilder: (context, error, stackTrace) {
-                      // Fallback kung walang image
-                      return const Icon(
-                        Icons.store,
-                        size: 100,
-                        color: Colors.white,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  // --- END NG LOGO ---
+                  const SizedBox(height: 10),
 
                   const Text(
                     "Log In",
@@ -118,7 +104,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         shadows: [Shadow(blurRadius: 10, color: Colors.black)]),
                   ),
                   const SizedBox(height: 40),
-
                   // Email Field
                   TextField(
                     controller: _email,
@@ -129,18 +114,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon:
                       const Icon(Icons.email, color: Colors.white70),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      // I-activate ang field background fill
                       filled: true,
-                      // Updated: Light gray with 15% opacity
                       fillColor: _boxFillColor.withOpacity(_fillOpacity),
                       enabledBorder: OutlineInputBorder(
-                        // Border opacity for enabled state
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.3)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        // Border opacity for focused state
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
@@ -152,41 +133,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Password Field
                   TextField(
                     controller: _password,
-                    // Use _isPasswordVisible to toggle obscurity
                     obscureText: !_isPasswordVisible,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: "Password",
                       prefixIcon: const Icon(Icons.lock, color: Colors.white70),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      // NEW: Suffix Icon (Toggle Eye)
                       suffixIcon: IconButton(
                         icon: Icon(
-                          // Choose the icon based on password visibility
                           _isPasswordVisible
                               ? Icons.visibility
                               : Icons.visibility_off,
                           color: Colors.white70,
                         ),
                         onPressed: () {
-                          // Toggle the state of password visibility
                           setState(() {
                             _isPasswordVisible = !_isPasswordVisible;
                           });
                         },
                       ),
-                      // I-activate ang field background fill
                       filled: true,
-                      // Updated: Light gray with 15% opacity
                       fillColor: _boxFillColor.withOpacity(_fillOpacity),
                       enabledBorder: OutlineInputBorder(
-                        // Border opacity for enabled state
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.3)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        // Border opacity for focused state
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
@@ -215,45 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           : const Text(
                         "Login",
                         style: TextStyle(
-                            fontSize: 18, color: _loginTextColor), // Updated text color
-                      ),
-                    ),
-                  ),
+                            fontSize: 18, color: _loginTextColor),
 
-                  const SizedBox(height: 10),
-
-                  // Create Account Link
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: const TextStyle(
-                        color: Colors
-                            .white70, // Slightly lighter color for the static part
-                        fontSize: 14,
                       ),
-                      children: [
-                        // Static text
-                        const TextSpan(
-                          text: "Don't have an account? ",
-                        ),
-                        // Clickable text
-                        TextSpan(
-                          text: "Create Account",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                            color: Colors.white, // Full white for emphasis
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const SignupScreen()),
-                              );
-                            },
-                        ),
-                      ],
                     ),
                   ),
                 ],

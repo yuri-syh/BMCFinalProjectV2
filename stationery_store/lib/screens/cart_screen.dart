@@ -37,7 +37,6 @@ class CartScreen extends StatelessWidget {
         children: [
           Expanded(
             child: ListView(
-              // I-loop ang CartItem values
               children: cart.items.values.map((cartItem) {
                 return ListTile(
                   leading: SizedBox(

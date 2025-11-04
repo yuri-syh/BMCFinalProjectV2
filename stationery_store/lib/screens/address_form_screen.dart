@@ -106,7 +106,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Details (Full Address)
+              // Details
               TextFormField(
                 initialValue: _details,
                 decoration: InputDecoration(

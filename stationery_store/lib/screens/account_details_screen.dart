@@ -18,6 +18,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   bool _isLoading = true;
   String _userName = 'Loading...';
   String _userEmail = 'Loading...';
+  String _userRole = 'Loading...';
 
   static const Color _appBarColor = Color(0xFF75a2b9);
 
@@ -36,6 +37,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       if (userDoc.exists) {
         final data = userDoc.data()!;
         _userName = data['name'] ?? 'No Name Set';
+        _userRole = data['role'] ?? 'user';
       }
     }
     setState(() {
@@ -48,7 +50,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     await _auth.signOut();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        // FIX: Removed 'const'
         MaterialPageRoute(builder: (context) => LoginScreen()),
             (Route<dynamic> route) => false,
       );
@@ -80,7 +81,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Details
+            // User Details Header
             const Text(
               "Account Details",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -93,7 +94,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             Card(
               elevation: 2,
               child: ListTile(
-                leading: const Icon(Icons.person, color: _appBarColor), // Person Icon
+                leading: const Icon(Icons.person, color: _appBarColor),
                 title: const Text("Name"),
                 subtitle: Text(_userName, style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
@@ -107,6 +108,20 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                 leading: const Icon(Icons.email, color: _appBarColor),
                 title: const Text("Email Address"),
                 subtitle: Text(_userEmail, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Role
+            Card(
+              elevation: 2,
+              child: ListTile(
+                leading: const Icon(Icons.security, color: _appBarColor), // Lock/Security Icon
+                title: const Text("User Role"),
+                subtitle: Text(
+                    _userRole.toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold)
+                ),
               ),
             ),
 

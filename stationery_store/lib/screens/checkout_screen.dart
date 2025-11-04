@@ -1,5 +1,3 @@
-// [FILENAME: checkout_screen.dart] - FINAL (Kulay ng Button = #464c56)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
@@ -144,7 +142,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // Utility row
   Widget _buildPriceRow(String label, String amount, Color color, {bool isTotal = false, double? totalFontSize}) {
     final double finalFontSize = isTotal ? (totalFontSize ?? 20) : 16;
 
@@ -182,7 +179,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             _buildPriceRow('Subtotal (${cart.totalItemCount} items)', '₱${cart.totalPrice.toStringAsFixed(2)}', Colors.black),
             const Divider(),
-            _buildPriceRow('Delivery Charge', '₱${CartProvider.deliveryFee.toStringAsFixed(2)}', Colors.green[700]!),
+            _buildPriceRow('Shipping Fee', '₱${CartProvider.deliveryFee.toStringAsFixed(2)}', Colors.green[700]!),
             const Divider(thickness: 1.5),
             _buildPriceRow('TOTAL', '₱${cart.grandTotal.toStringAsFixed(2)}', Colors.red[700]!, isTotal: true, totalFontSize: 16),
           ],

@@ -10,7 +10,6 @@ class MyAddressesScreen extends StatelessWidget {
 
   static const Color _appBarColor = Color(0xFF75a2b9);
 
-  // Functionality sa add/edit screen
   void _navigateToAddEditScreen(BuildContext context, {Address? address}) {
     Navigator.of(context).push(
       MaterialPageRoute(

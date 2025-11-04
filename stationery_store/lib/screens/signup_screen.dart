@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -15,13 +16,16 @@ class _SignupScreenState extends State<SignupScreen> {
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
   bool loading = false;
-  // NEW: State variables for password visibility
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   static const Color _boxFillColor = Color(0xFFD5D6D9);
   static const double _fillOpacity = 0.15;
   static const Color _loginTextColor = Color(0xFF464C56);
+  static const Color _darkOverlayColor = Color(0xFF464C56);
 
   @override
   void dispose() {
@@ -33,7 +37,6 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _signup() async {
-    // Basic input validation
     if (_email.text.trim().isEmpty ||
         _password.text.trim().isEmpty ||
         _name.text.trim().isEmpty ||
@@ -44,38 +47,62 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (_password.text != _confirmPassword.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Passwords do not match.")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Password and Confirm Password do not match.")));
       return;
     }
 
-    setState(() => loading = true);
+    if (_password.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Password must be at least 6 characters long.")));
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
+
     try {
-      final userCredential =
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _email.text.trim(),
         password: _password.text.trim(),
       );
 
-      // Optionally update user's display name
-      await userCredential.user?.updateDisplayName(_name.text.trim());
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
+        'name': _name.text.trim(),
+        'email': _email.text.trim(),
+        'role': 'user',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-      // Navigate back to LoginScreen upon successful signup
       if (mounted) {
-        Navigator.pushReplacement(
-          // FIX: Removed 'const'
-            context,
-            MaterialPageRoute(builder: (_) => LoginScreen()));
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (Route<dynamic> route) => false,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Account created successfully! Please log in.")));
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                e.message ?? "An unexpected error occurred during signup.")));
+      String message = 'An error occurred. Please try again.';
+      if (e.code == 'weak-password') {
+        message = 'The password provided is too weak.';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'The account already exists for that email.';
+      } else if (e.code == 'invalid-email') {
+        message = 'The email address is not valid.';
       }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("An unexpected error occurred.")));
     } finally {
       if (mounted) {
-        setState(() => loading = false);
+        setState(() {
+          loading = false;
+        });
       }
     }
   }
@@ -83,6 +110,12 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
           Container(
@@ -94,115 +127,115 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
 
-          // 2. Overlay for readability
           Container(
             color: Colors.black.withOpacity(0.5),
           ),
 
-          // 3. Sign Up Content
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // --- DINAGDAG NA LOGO ---
-                  // Siguraduhin na mayroon kang 'assets/images/logo.png' sa iyong proyekto
-                  // at idinagdag mo ito sa 'pubspec.yaml'
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 150, // Pwede mong baguhin ang taas nito
-                    errorBuilder: (context, error, stackTrace) {
-                      // Fallback kung walang image
-                      return const Icon(
-                        Icons.store,
-                        size: 100,
-                        color: Colors.white,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  // --- END NG LOGO ---
-
+                  const SizedBox(height: 50),
                   const Text(
-                    "Create New Account",
+                    'Create Account',
                     style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [Shadow(blurRadius: 10, color: Colors.black)]),
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
 
-                  // Name Field
                   TextField(
                     controller: _name,
-                    keyboardType: TextInputType.name,
+                    keyboardType: TextInputType.text,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: "Name",
-                      prefixIcon:
-                      const Icon(Icons.person, color: Colors.white70),
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelText: 'Name',
+                      labelStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 16),
+                      hintText: 'Enter your full name',
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.5), fontSize: 14),
                       filled: true,
                       fillColor: _boxFillColor.withOpacity(_fillOpacity),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide:
-                        BorderSide(color: Colors.white.withOpacity(0.3)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
+                      prefixIcon: const Icon(Icons.person, color: Colors.white),
+                      border: OutlineInputBorder(
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.6)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
 
-                  // Email Field
+                  const SizedBox(height: 20),
+
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: "Email",
-                      prefixIcon:
-                      const Icon(Icons.email, color: Colors.white70),
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelText: 'Email',
+                      labelStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 16),
+                      hintText: 'Enter your email address',
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.5), fontSize: 14),
                       filled: true,
                       fillColor: _boxFillColor.withOpacity(_fillOpacity),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide:
-                        BorderSide(color: Colors.white.withOpacity(0.3)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
+                      prefixIcon:
+                      const Icon(Icons.email, color: Colors.white),
+                      border: OutlineInputBorder(
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.6)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
 
-                  // Password Field
+                  const SizedBox(height: 20),
+
                   TextField(
                     controller: _password,
-                    // Use _isPasswordVisible to toggle obscurity
                     obscureText: !_isPasswordVisible,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: "Password",
-                      prefixIcon: const Icon(Icons.lock, color: Colors.white70),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      // Suffix Icon (Toggle Eye)
+                      labelText: 'Password',
+                      labelStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 16),
+                      hintText: 'Enter your password',
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.5), fontSize: 14),
+                      filled: true,
+                      fillColor: _boxFillColor.withOpacity(_fillOpacity),
+                      prefixIcon:
+                      const Icon(Icons.lock, color: Colors.white),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isPasswordVisible
                               ? Icons.visibility
                               : Icons.visibility_off,
-                          color: Colors.white70,
+                          color: Colors.white.withOpacity(0.8),
                         ),
                         onPressed: () {
                           setState(() {
@@ -210,39 +243,46 @@ class _SignupScreenState extends State<SignupScreen> {
                           });
                         },
                       ),
-                      filled: true,
-                      fillColor: _boxFillColor.withOpacity(_fillOpacity),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide:
-                        BorderSide(color: Colors.white.withOpacity(0.3)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
+                      border: OutlineInputBorder(
                         borderSide:
                         BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.6)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
 
-                  // Confirm Password Field
+                  const SizedBox(height: 20),
+
                   TextField(
                     controller: _confirmPassword,
                     obscureText: !_isConfirmPasswordVisible,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      labelText: "Confirm Password",
+                      labelText: 'Confirm Password',
+                      labelStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 16),
+                      hintText: 'Confirm your password',
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.5), fontSize: 14),
+                      filled: true,
+                      fillColor: _boxFillColor.withOpacity(_fillOpacity),
                       prefixIcon:
-                      const Icon(Icons.lock_reset, color: Colors.white70),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      // Suffix Icon (Toggle Eye)
+                      const Icon(Icons.lock, color: Colors.white),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isConfirmPasswordVisible
                               ? Icons.visibility
                               : Icons.visibility_off,
-                          color: Colors.white70,
+                          color: Colors.white.withOpacity(0.8),
                         ),
                         onPressed: () {
                           setState(() {
@@ -251,24 +291,25 @@ class _SignupScreenState extends State<SignupScreen> {
                           });
                         },
                       ),
-                      filled: true,
-                      fillColor: _boxFillColor.withOpacity(_fillOpacity),
+                      border: OutlineInputBorder(
+                        borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.6)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderSide:
-                        BorderSide(color: Colors.white.withOpacity(0.3)),
+                        BorderSide(color: Colors.white.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide:
-                        BorderSide(color: Colors.white.withOpacity(0.6)),
+                        borderSide: const BorderSide(color: Colors.white),
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 40),
 
-                  // Create Account
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -291,18 +332,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
-                  // Back to Login
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                        "Already have an account? Go back to Login",
-                        style: TextStyle(
-                            color: Colors.white,
-                            decoration: TextDecoration.underline)),
-                  ),
+                  const SizedBox(height: 50),
                 ],
               ),
             ),

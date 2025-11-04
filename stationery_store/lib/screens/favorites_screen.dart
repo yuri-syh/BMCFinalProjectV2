@@ -12,7 +12,6 @@ class FavoritesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Kinukuha ang reference sa products collection
     final productsCollection = FirebaseFirestore.instance.collection('products');
 
     return Consumer<FavoritesProvider>(

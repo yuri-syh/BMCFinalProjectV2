@@ -10,6 +10,7 @@ import 'login_screen.dart';
 import 'account_details_screen.dart';
 import 'my_addresses_screen.dart';
 import 'favorites_screen.dart';
+import 'package:stationery_store/admin/admin_add_product_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -26,10 +27,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
   String _searchQuery = '';
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
+  late Future<String> _userRoleFuture;
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _userRoleFuture = _fetchUserRole();
   }
 
   @override
@@ -41,15 +45,39 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   void _onSearchChanged() {
     setState(() {
-      _searchQuery = _searchController.text.toLowerCase().trim();
+      _searchQuery = _searchController.text.toLowerCase();
     });
   }
 
-  Future<void> _logout(BuildContext context) async {
+  Future<String> _fetchUserRole() async {
+    if (_currentUser == null) return 'guest';
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUser!.uid)
+          .get();
+      return doc.data()?['role'] ?? 'user';
+    } catch (e) {
+      print("Error fetching user role: $e");
+      return 'user';
+    }
+  }
+
+  void _navigateToAdminPanel() {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminAddProductScreen()),
+    );
+  }
+
+  void _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => LoginScreen()),
             (Route<dynamic> route) => false,
       );
     }
@@ -57,256 +85,287 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String displayName = _currentUser?.displayName ?? 'User';
-    final String email = _currentUser?.email ?? 'No Email';
-    const String userRole = 'User';
-
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Office Stationery'),
+        backgroundColor: ProductsScreen._appBarColor,
+        actions: [
+          FutureBuilder<String>(
+            future: _userRoleFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done &&
+                  snapshot.hasData &&
+                  snapshot.data != 'admin') {
+
+                return Consumer<CartProvider>(
+                  builder: (context, cart, child) {
+                    final itemCount = cart.totalItemCount;
+
+                    return Stack(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                          child: SizedBox(
+                            width: 50,
+                            height: 50,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.shopping_cart,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                              onPressed: () {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+                              },
+                            ),
+                          ),
+                        ),
+
+                        if (itemCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                itemCount > 99 ? '99+' : itemCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ),
       drawer: Drawer(
-        // Ginagamit ang Column upang ihiwalay ang DrawerHeader at ang 'Logout' sa dulo
         child: Column(
           children: <Widget>[
-            // User Account (DrawerHeader)
-            DrawerHeader(
-              padding: EdgeInsets.zero,
-              margin: EdgeInsets.zero,
-              decoration: const BoxDecoration(
-                color: Colors.transparent,
+            UserAccountsDrawerHeader(
+              decoration: BoxDecoration(
+                color: ProductsScreen._appBarColor,
               ),
-              child: Container(
-                // ITO ANG NAGPA-FULL WIDTH NG GRADIENT
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [ProductsScreen._appBarColor, ProductsScreen._darkColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+              // User Account Icon
+              currentAccountPicture: const Padding(
+                padding: EdgeInsets.only(bottom: 5.0), // Konting baba
+                child: Icon(Icons.account_circle, size: 65, color: Colors.white),
+              ),
+              // Email
+              accountName: const Text(
+                'Aisle Kazuichi',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                // Inayos na padding para sa content
-                padding: const EdgeInsets.only(top: 20.0, left: 16.0, bottom: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.person, color: ProductsScreen._darkColor, size: 30),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
-                    Text('$email | $userRole', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  ],
+              ),
+              accountEmail: Text(
+                _currentUser?.email ?? 'Guest User',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 15,
                 ),
               ),
             ),
-
 
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  // My Account
-                  ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: const Text('My Account'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AccountDetailsScreen()),
-                      );
-                    },
-                  ),
+              child: FutureBuilder<String>(
+                future: _userRoleFuture,
+                builder: (context, snapshot) {
+                  final isAdmin = snapshot.hasData && snapshot.data == 'admin';
 
-                  // Favorites
-                  ListTile(
-                    leading: const Icon(Icons.favorite_border),
-                    title: const Text('Favorites'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => FavoritesScreen()),
-                      );
-                    },
-                  ),
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      // Account Details
+                      ListTile(
+                        leading: const Icon(Icons.person),
+                        title: const Text('Account Details'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDetailsScreen()));
+                        },
+                      ),
 
-                  // My Addresses
-                  ListTile(
-                    leading: const Icon(Icons.location_on_outlined),
-                    title: const Text('My Addresses'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MyAddressesScreen()),
-                      );
-                    },
-                  ),
-                ],
+                      // Favorites
+                      if (!isAdmin)
+                        ListTile(
+                          leading: const Icon(Icons.favorite),
+                          title: const Text('Favorites'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => FavoritesScreen()));
+                          },
+                        ),
+
+                      // My Addresses
+                      if (!isAdmin)
+                        ListTile(
+                          leading: const Icon(Icons.location_on),
+                          title: const Text('My Addresses'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAddressesScreen()));
+                          },
+                        ),
+
+                      // Admin Panel
+                      if (isAdmin)
+                        ListTile(
+                          leading: const Icon(Icons.admin_panel_settings, color: ProductsScreen._appBarColor),
+                          title: const Text('Admin Panel'),
+                          onTap: _navigateToAdminPanel,
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
 
-            // Logout area - inilagay sa labas ng Expanded para manatili sa ilalim
-            const Divider(),
+            const Divider(), // Horizontal line
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _logout(context);
-              },
+              onTap: _logout,
             ),
-
-            // Maliit na espasyo sa ilalim (para sa safety area ng device)
-            SizedBox(height: MediaQuery.of(context).padding.bottom > 0 ? 8.0 : 0.0),
+            const SizedBox(height: 10),
           ],
         ),
       ),
+      body: FutureBuilder<String>(
+        future: _userRoleFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      appBar: AppBar(
-        title: const Text("Office Stationery Store"),
-        foregroundColor: Colors.white,
+          final isAdmin = snapshot.hasData && snapshot.data == 'admin';
 
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF75a2b9),
-                Color(0xFF464c56),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+          if (isAdmin) {
+            // Admin Home Screen
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_person, size: 80, color: ProductsScreen._appBarColor),
+                    SizedBox(height: 20),
+                    Text(
+                      "Welcome, Admin!",
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: ProductsScreen._darkColor),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      "You are successfully logged in.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
-        actions: [
-          // Shopping Cart
-          Consumer<CartProvider>(
-            builder: (context, cart, child) => Stack(
-              alignment: Alignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
+          // User Home Screen
+          return Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search products',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                        : null,
+                  ),
+                ),
+              ),
+
+              // Product
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('products').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(child: Text("No products available."));
+                    }
+
+                    final allProducts = snapshot.data!.docs
+                        .map((doc) => Product.fromFirestore(doc))
+                        .toList();
+
+                    final filteredProducts = allProducts.where((product) {
+                      return product.name.toLowerCase().contains(_searchQuery);
+                    }).toList();
+
+                    if (_searchQuery.length >= 3 && filteredProducts.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          "No products found matching your search.",
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      );
+                    }
+
+                    final displayProducts = _searchQuery.length < 3 ? allProducts : filteredProducts;
+
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(10),
+                      gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisExtent: 310,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
+                      itemCount: displayProducts.length,
+                      itemBuilder: (context, i) => ProductCard(product: displayProducts[i]),
                     );
                   },
                 ),
-                if (cart.totalItemCount > 0)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        cart.totalItemCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-              ],
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search products...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    _onSearchChanged();
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
-                fillColor: ProductsScreen._appBarColor.withOpacity(0.1),
-                filled: true,
               ),
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('products').snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(
-                    color: ProductsScreen._appBarColor,
-                  ));
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("No products available."));
-                }
-
-                final allProducts = snapshot.data!.docs
-                    .map((doc) => Product.fromFirestore(doc))
-                    .toList();
-
-                final filteredProducts = allProducts.where((product) {
-                  return product.name.toLowerCase().contains(_searchQuery);
-                }).toList();
-
-                if (_searchQuery.length >= 3 && filteredProducts.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      "No products found matching your search.",
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  );
-                }
-
-                final displayProducts = _searchQuery.length < 3 ? allProducts : filteredProducts;
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(10),
-                  gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisExtent: 310,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: displayProducts.length,
-                  itemBuilder: (context, i) => ProductCard(product: displayProducts[i]),
-                );
-              },
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
